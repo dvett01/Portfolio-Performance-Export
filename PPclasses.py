@@ -98,8 +98,14 @@ class PortfolioPerformanceFile:
                         df = df.append(pd.Series([date, typez, float(amount)/100, cur, float(shares)/100000000, isin,wkn,ticker_sym,sym_name,acct_name,note], index=dfcols),ignore_index=True)
         return df
     
+    def subtree_sum(self, element, attrib):
+        summe = 0
+        for i in element:
+            summe= summe + float(i.attrib[attrib])/100
+        return summe
+    
     def get_df_all_portfolio_transactions(self):
-        dfcols = ['date',"type",'amount',"cur","shares","isin","wkn","ticker_sym","sym_name", "Acct", "note"]
+        dfcols = ['date',"type","fee",'fee_iso',"tax","tax_iso",'amount',"cur","shares","isin","wkn","ticker_sym","sym_name", "Acct", "note"]
         df = pd.DataFrame(columns=dfcols)
         for idx, ptf in enumerate(self.root.findall(".//portfolios/")):
                 ptf = self.check_for_ref_lx(ptf)
@@ -108,8 +114,12 @@ class PortfolioPerformanceFile:
                     ta = self.check_for_ref_lx(ta)
                     for ta in ta:
                         date = self.check_for_ref_lx(ta.find("date")).text if ta.find('date') is not None else ""
-                        shares = ta.find("shares").text if ta.find('shares') is not None else 0
-                        amount = ta.find("amount").text if ta.find('amount') is not None else 0
+                        fee = float(ta.find('units/unit[@type="FEE"]/amount').attrib["amount"])/100 if ta.find('units/unit[@type="FEE"]/amount') is not None else 0
+                        fee_iso = ta.find('units/unit[@type="FEE"]/amount').attrib["currency"] if ta.find('units/unit[@type="FEE"]/amount') is not None else ""
+                        tax= float(self.subtree_sum(ta.findall('units/unit[@type="TAX"]/amount'),"amount")) if ta.findall('units/unit[@type="TAX"]/amount') is not None else 0
+                        tax_iso = ta.find('units/unit[@type="TAX"]/amount').attrib["currency"] if ta.find('units/unit[@type="TAX"]/amount') is not None else ""
+                        shares = float(ta.find("shares").text)/100000000 if ta.find('shares') is not None else 0
+                        amount = float(ta.find("amount").text)/100 if ta.find('amount') is not None else 0
                         cur = ta.find("currencyCode").text if ta.find('currencyCode') is not None else ""
                         note = ta.find("note").text if ta.find('note') is not None else ""
                         isin=self.check_for_ref_lx(ta.find("security")).find("isin").text if ta.find('security') is not None else ""
@@ -121,7 +131,7 @@ class PortfolioPerformanceFile:
                         except: ticker_sym=""
                         sym_name=self.check_for_ref_lx(ta.find("security")).find("name").text if ta.find('security') is not None else ""
                         typez = ta.find("type").text if ta.find('type') is not None else ""
-                        df = df.append(pd.Series([date, typez, float(amount)/100, cur, float(shares)/100000000, isin,wkn,ticker_sym,sym_name,acct_name,note], index=dfcols),ignore_index=True)
+                        df = df.append(pd.Series([date, typez, fee,fee_iso,tax,tax_iso,amount, cur, shares, isin,wkn,ticker_sym,sym_name,ptf_name,note], index=dfcols),ignore_index=True)
         return df
     
 

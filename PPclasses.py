@@ -5,8 +5,6 @@ import pandas as pd
 class PortfolioPerformanceFile:
     def __init__ (self, filepath):
         self.filepath = filepath
-        #self.pp_tree = et.parse(filepath)
-        #self.root = self.pp_tree.getroot()
         self.root = et.parse(filepath)
         self.securities = []
         
@@ -24,11 +22,11 @@ class PortfolioPerformanceFile:
         for idx, security in enumerate(self.root.findall(".//securities/security")):
             if security is not None:
                     sec_idx = idx + 1
-                    sec_uuid =  security.find('uuid').text
-                    sec_name =  security.find('name').text
-                    sec_isin =  security.find('isin').text
-                    sec_wkn =  security.find('wkn').text
-                    sec_curr = security.find('currencyCode').text
+                    sec_uuid =  security.find('uuid').text if security.find('uuid') is not None else ""
+                    sec_name =  security.find('name').text if security.find('name') is not None else ""
+                    sec_isin =  security.find('isin').text if security.find('isin') is not None else ""
+                    sec_wkn =  security.find('wkn').text if security.find('wkn') is not None else ""
+                    sec_curr = security.find('currencyCode').text if security.find('currencyCode') is not None else ""
                     sec_ticker = security.find('tickerSymbol').text if security.find('tickerSymbol') is not None else ""
                     df = df.append(pd.Series([sec_idx, sec_uuid, sec_name,sec_ticker, sec_isin,sec_wkn, sec_curr], index=dfcols),ignore_index=True)
         return df
@@ -72,32 +70,6 @@ class PortfolioPerformanceFile:
             df = df.append(pd.Series([acc_idx, acc_uuid, acc_name,acc_currencycode, acc_isretired,acc_xpath], index=dfcols),ignore_index=True)
         return df
     
-    def get_df_all_account_transactions(self):
-        dfcols = ['date',"type",'amount',"cur","tax","shares","isin","wkn","ticker_sym","sym_name", "Acct", "note"]
-        df = pd.DataFrame(columns=dfcols)
-        for idx, acct in enumerate(self.root.findall(".//accounts/account")):
-                acct = self.check_for_ref_lx(acct)
-                acct_name =  acct.find('name').text if acct.find('name') is not None else ""
-                for ta in acct.findall(".//transactions/account-transaction"):
-                    if ta is not None:
-                        ta = self.check_for_ref_lx(ta)
-                        date = self.check_for_ref_lx(ta.find("date")).text if ta.find('date') is not None else ""
-                        shares = float(ta.find("shares").text)/100000000 if ta.find('shares') is not None else 0
-                        amount = float(ta.find("amount").text)/100 if ta.find('amount') is not None else 0
-                        cur = ta.find("currencyCode").text if ta.find('currencyCode') is not None else ""
-                        tax= float(self.subtree_sum(ta.findall('units/unit[@type="TAX"]/amount'),"amount")) if ta.findall('units/unit[@type="TAX"]/amount') is not None else 0
-                        note = ta.find("note").text if ta.find('note') is not None else ""
-                        isin=self.check_for_ref_lx(ta.find("security")).find("isin").text if ta.find('security') is not None else ""
-                        try:
-                            wkn=self.check_for_ref_lx(ta.find("security")).find("wkn").text if ta.find('security') is not None else "" 
-                        except: wkn=""
-                        try:
-                            ticker_sym=self.check_for_ref_lx(ta.find("security")).find("tickerSymbol").text if ta.find('security') is not None else ""
-                        except: ticker_sym=""
-                        sym_name=self.check_for_ref_lx(ta.find("security")).find("name").text if ta.find('security') is not None else ""
-                        typez = ta.find("type").text if ta.find('type') is not None else ""
-                        df = df.append(pd.Series([date, typez, amount, cur,tax, shares, isin,wkn,ticker_sym,sym_name,acct_name,note], index=dfcols),ignore_index=True)
-        return df
     
     def subtree_sum(self, element, attrib):
         summe = 0
@@ -105,38 +77,122 @@ class PortfolioPerformanceFile:
             summe= summe + float(i.attrib[attrib])/100
         return summe
     
-    def get_df_all_portfolio_transactions(self):
-        dfcols = ['date',"type","fee",'fee_iso',"tax","tax_iso",'amount',"cur","shares","isin","wkn","ticker_sym","sym_name", "Acct", "note"]
-        df = pd.DataFrame(columns=dfcols)
-        for idx, ptf in enumerate(self.root.findall(".//portfolios/")):
-                ptf = self.check_for_ref_lx(ptf)
-                ptf_name =  ptf.find('name').text if ptf.find('name') is not None else ""
-                for ta in ptf.findall("./transactions"):
-                    ta = self.check_for_ref_lx(ta)
-                    for ta in ta:
-                        date = self.check_for_ref_lx(ta.find("date")).text if ta.find('date') is not None else ""
-                        fee = float(ta.find('units/unit[@type="FEE"]/amount').attrib["amount"])/100 if ta.find('units/unit[@type="FEE"]/amount') is not None else 0
-                        fee_iso = ta.find('units/unit[@type="FEE"]/amount').attrib["currency"] if ta.find('units/unit[@type="FEE"]/amount') is not None else ""
-                        tax= float(self.subtree_sum(ta.findall('units/unit[@type="TAX"]/amount'),"amount")) if ta.findall('units/unit[@type="TAX"]/amount') is not None else 0
-                        tax_iso = ta.find('units/unit[@type="TAX"]/amount').attrib["currency"] if ta.find('units/unit[@type="TAX"]/amount') is not None else ""
-                        shares = float(ta.find("shares").text)/100000000 if ta.find('shares') is not None else 0
-                        amount = float(ta.find("amount").text)/100 if ta.find('amount') is not None else 0
-                        cur = ta.find("currencyCode").text if ta.find('currencyCode') is not None else ""
-                        note = ta.find("note").text if ta.find('note') is not None else ""
-                        isin=self.check_for_ref_lx(ta.find("security")).find("isin").text if ta.find('security') is not None else ""
-                        try:
-                            wkn=self.check_for_ref_lx(ta.find("security")).find("wkn").text if ta.find('security') is not None else "" 
-                        except: wkn=""
-                        try:
-                            ticker_sym=self.check_for_ref_lx(ta.find("security")).find("tickerSymbol").text if ta.find('security') is not None else ""
-                        except: ticker_sym=""
-                        sym_name=self.check_for_ref_lx(ta.find("security")).find("name").text if ta.find('security') is not None else ""
-                        typez = ta.find("type").text if ta.find('type') is not None else ""
-                        df = df.append(pd.Series([date, typez, fee,fee_iso,tax,tax_iso,amount, cur, shares, isin,wkn,ticker_sym,sym_name,ptf_name,note], index=dfcols),ignore_index=True)
-        return df
     
+    def get_transactions(self):
+        cross_ptf_ta = []
+        acct_ta = []
+        for account in self.root.findall("./accounts/account"): 
+            account = self.check_for_ref_lx(account)
+            account_uuid = account.find("uuid").text
+            account_name = account.find("name").text
+            account_currencyCode = account.find("currencyCode").text
+            
+            for account_transaction in account.findall("transactions/account-transaction"): 
+                account_transaction = self.check_for_ref_lx(account_transaction)
+                account_transaction_uuid = account_transaction.find("uuid").text
+                account_transaction_date = account_transaction.find("date").text
+                account_transaction_currencyCode = account_transaction.find("currencyCode").text
+                account_transaction_amount = float(account_transaction.find("amount").text)/100
+                account_transaction_shares = float(account_transaction.find("shares").text)/100000000
+                account_transaction_type = account_transaction.find("type").text
+                account_transaction_note = account_transaction.find('note').text if account_transaction.find('note') is not None else ""
+                account_transaction_source = account_transaction.find('source').text if account_transaction.find('source') is not None else ""
+                account_transaction_security = self.check_for_ref_lx(account_transaction.find("security")).find("uuid").text if account_transaction.find("security") is not None else ""
+                account_transaction_fee = float(account_transaction.find('units/unit[@type="FEE"]/amount').attrib["amount"])/100 if account_transaction.find('units/unit[@type="FEE"]/amount') is not None else 0
+                account_transaction_fee_iso = account_transaction.find('units/unit[@type="FEE"]/amount').attrib["currency"] if account_transaction.find('units/unit[@type="FEE"]/amount') is not None else ""
+                account_transaction_tax= float(self.subtree_sum(account_transaction.findall('units/unit[@type="TAX"]/amount'),"amount")) if account_transaction.findall('units/unit[@type="TAX"]/amount') is not None else 0
+                account_transaction_tax_iso = account_transaction.find('units/unit[@type="TAX"]/amount').attrib["currency"] if account_transaction.find('units/unit[@type="TAX"]/amount') is not None else ""
+                
+                account_transaction_gross_value_amount = float(account_transaction.find('units/unit[@type="GROSS_VALUE"]/amount').attrib["amount"])/100 if account_transaction.find('units/unit[@type="GROSS_VALUE"]/amount') is not None else 0
+                account_transaction_gross_value_amount_iso = account_transaction.find('units/unit[@type="GROSS_VALUE"]/amount').attrib["currency"] if account_transaction.find('units/unit[@type="GROSS_VALUE"]/amount') is not None else ""
+                account_transaction_gross_value_amount_forex = float(account_transaction.find('units/unit[@type="GROSS_VALUE"]/forex').attrib["amount"])/100 if account_transaction.find('units/unit[@type="GROSS_VALUE"]/forex') is not None else 0
+                account_transaction_gross_value_amount_forex_iso = account_transaction.find('units/unit[@type="GROSS_VALUE"]/forex').attrib["currency"] if account_transaction.find('units/unit[@type="GROSS_VALUE"]/forex') is not None else ""
+                account_transaction_gross_value_exchangeRate = float(account_transaction.find('units/unit[@type="GROSS_VALUE"]/exchangeRate').text) if account_transaction.find('units/unit[@type="GROSS_VALUE"]/exchangeRate') is not None else 0
+                
+                acct_ta.append([
+                    account_uuid, "", "",account_transaction_uuid, account_transaction_date, account_transaction_currencyCode, account_transaction_amount, account_transaction_shares,
+                    account_transaction_type, account_transaction_note, account_transaction_source, account_transaction_security,
+                    account_transaction_fee, account_transaction_fee_iso,
+                    account_transaction_tax, account_transaction_tax_iso,
+                    account_transaction_gross_value_amount, account_transaction_gross_value_amount_iso,
+                    account_transaction_gross_value_amount_forex, account_transaction_gross_value_amount_forex_iso,
+                    account_transaction_gross_value_exchangeRate
+                ])
+                
+                
+                for crossEntry in account_transaction.findall("crossEntry"):
+                    crossEntry = self.check_for_ref_lx(crossEntry)
+                    crossEntry_account_ref = self.check_for_ref_lx(crossEntry.find("account")).find("uuid").text if crossEntry.find("account") is not None else ""
+                    
+                    
+    
+                for portfolio in account_transaction.findall("crossEntry/portfolio"):
+                    portfolio = self.check_for_ref_lx(portfolio)
+                    portfolio_uuid = portfolio.find("uuid").text
+                                        
+                    for portfolio_transaction in portfolio.findall("transactions/portfolio-transaction"):
+                        portfolio_transaction = self.check_for_ref_lx(portfolio_transaction)
+                        portfolio_transaction_uuid = portfolio_transaction.find("uuid").text
+                        portfolio_transaction_date = portfolio_transaction.find("date").text
+                        portfolio_transaction_currencyCode = portfolio_transaction.find("currencyCode").text
+                        portfolio_transaction_amount = float(portfolio_transaction.find("amount").text)/100
+                        portfolio_transaction_shares = float(portfolio_transaction.find("shares").text)/100000000
+                        portfolio_transaction_type = portfolio_transaction.find("type").text
+                        portfolio_transaction_note = portfolio_transaction.find('note').text if portfolio_transaction.find('note') is not None else ""
+                        portfolio_transaction_source = portfolio_transaction.find('source').text if portfolio_transaction.find('source') is not None else ""
+                        portfolio_transaction_security = self.check_for_ref_lx(portfolio_transaction.find("security")).find("uuid").text if portfolio_transaction.find("security") is not None else ""
+                        portfolio_transaction_fee = float(portfolio_transaction.find('units/unit[@type="FEE"]/amount').attrib["amount"])/100 if portfolio_transaction.find('units/unit[@type="FEE"]/amount') is not None else 0
+                        portfolio_transaction_fee_iso = portfolio_transaction.find('units/unit[@type="FEE"]/amount').attrib["currency"] if portfolio_transaction.find('units/unit[@type="FEE"]/amount') is not None else ""
+                        portfolio_transaction_tax= float(self.subtree_sum(portfolio_transaction.findall('units/unit[@type="TAX"]/amount'),"amount")) if portfolio_transaction.findall('units/unit[@type="TAX"]/amount') is not None else 0
+                        portfolio_transaction_tax_iso = portfolio_transaction.find('units/unit[@type="TAX"]/amount').attrib["currency"] if portfolio_transaction.find('units/unit[@type="TAX"]/amount') is not None else ""
+                        
+                        portfolio_transaction_gross_value_amount = float(portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/amount').attrib["amount"])/100 if portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/amount') is not None else 0
+                        portfolio_transaction_gross_value_amount_iso = portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/amount').attrib["currency"] if portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/amount') is not None else ""
+                        portfolio_transaction_gross_value_amount_forex = float(portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/forex').attrib["amount"])/100 if portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/forex') is not None else 0
+                        portfolio_transaction_gross_value_amount_forex_iso = portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/forex').attrib["currency"] if portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/forex') is not None else ""
+                        portfolio_transaction_gross_value_exchangeRate = float(portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/exchangeRate').text) if portfolio_transaction.find('units/unit[@type="GROSS_VALUE"]/exchangeRate') is not None else 0
+                        
+                        cross_ptf_ta.append([account_uuid,
+                                   crossEntry_account_ref,
+                                   portfolio_uuid,
+                                   portfolio_transaction_uuid, 
+                                   portfolio_transaction_date, portfolio_transaction_currencyCode, portfolio_transaction_amount, portfolio_transaction_shares,
+                                   portfolio_transaction_type, portfolio_transaction_note, portfolio_transaction_source, portfolio_transaction_security, 
+                                   portfolio_transaction_fee, portfolio_transaction_fee_iso, 
+                                   portfolio_transaction_tax, portfolio_transaction_tax_iso,
+                                   portfolio_transaction_gross_value_amount, portfolio_transaction_gross_value_amount_iso,
+                                   portfolio_transaction_gross_value_amount_forex, portfolio_transaction_gross_value_amount_forex_iso,
+                                   portfolio_transaction_gross_value_exchangeRate])
 
+        cols=["account_uuid", 
+                                "crossEntry_account_ref",
+                                "portfolio_uuid",
+                                   "portfolio_transaction_uuid", 
+                                   "portfolio_transaction_date", "portfolio_transaction_currencyCode", "portfolio_transaction_amount", "portfolio_transaction_shares",
+                                   "portfolio_transaction_type", "portfolio_transaction_note", "portfolio_transaction_source", "portfolio_transaction_security", 
+                                   "portfolio_transaction_fee", "portfolio_transaction_fee_iso", 
+                                   "portfolio_transaction_tax", "portfolio_transaction_tax_iso",
+                                   "portfolio_transaction_gross_value_amount", "portfolio_transaction_gross_value_amount_iso",
+                                   "portfolio_transaction_gross_value_amount_forex", "portfolio_transaction_gross_value_amount_forex_iso",
+                                   "portfolio_transaction_gross_value_exchangeRate"
+                        ]
+        acct_ta = pd.DataFrame(acct_ta, columns=cols)
+        cross_ptf_ta = pd.DataFrame(cross_ptf_ta, columns=cols)
         
-PP = PortfolioPerformanceFile(filepath="MeinePortfolien.xml")
-
-PP.get_df_all_portfolio_transactions()
+        ta = pd.concat([acct_ta, cross_ptf_ta],axis=0)
+        
+        securities = self.get_df_securities().set_index("uuid")
+        accounts = self.get_df_accounts().set_index("uuid")
+        portfolios = self.get_df_portfolios().set_index("uuid")
+        ta["account_name"] = ta["account_uuid"].map(accounts["name"])
+        ta["portfolio_name"] = ta["portfolio_uuid"].map(portfolios["name"])
+        ta["crossEntry_account_ref_name"] = ta["crossEntry_account_ref"].map(accounts["name"])
+        ta["security_name"] = ta["portfolio_transaction_security"].map(securities["name"])
+        ta["date"] = pd.to_datetime(ta["portfolio_transaction_date"],format="%Y-%m-%dT%H:%M")
+        ta["Kurs"] = ta["portfolio_transaction_amount"]/ ta["portfolio_transaction_shares"]
+        return ta
+    
+    
+    
+PP = PortfolioPerformanceFile(filepath="All Portolios.xml")
+ta = PP.get_transactions()
